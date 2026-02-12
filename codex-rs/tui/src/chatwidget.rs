@@ -67,6 +67,7 @@ use codex_core::protocol::AgentReasoningDeltaEvent;
 use codex_core::protocol::AgentReasoningEvent;
 use codex_core::protocol::AgentReasoningRawContentDeltaEvent;
 use codex_core::protocol::AgentReasoningRawContentEvent;
+use codex_core::protocol::AgentStatus;
 use codex_core::protocol::ApplyPatchApprovalRequestEvent;
 use codex_core::protocol::BackgroundEventEvent;
 use codex_core::protocol::CodexErrorInfo;
@@ -611,6 +612,8 @@ pub(crate) struct ChatWidget {
     session_network_proxy: Option<codex_core::protocol::SessionNetworkProxyRuntime>,
     // Shared latch so we only warn once about invalid status-line item IDs.
     status_line_invalid_items_warned: Arc<AtomicBool>,
+    // Last known non-final statuses for sub agents keyed by thread id.
+    sub_agent_statuses: HashMap<ThreadId, AgentStatus>,
     // Cached git branch name for the status line (None if unknown).
     status_line_branch: Option<String>,
     // CWD used to resolve the cached branch; change resets branch state.
@@ -2664,6 +2667,7 @@ impl ChatWidget {
             current_cwd,
             session_network_proxy: None,
             status_line_invalid_items_warned,
+            sub_agent_statuses: HashMap::new(),
             status_line_branch: None,
             status_line_branch_cwd: None,
             status_line_branch_pending: false,
@@ -2829,6 +2833,7 @@ impl ChatWidget {
             current_cwd,
             session_network_proxy: None,
             status_line_invalid_items_warned,
+            sub_agent_statuses: HashMap::new(),
             status_line_branch: None,
             status_line_branch_cwd: None,
             status_line_branch_pending: false,
@@ -2983,6 +2988,7 @@ impl ChatWidget {
             current_cwd,
             session_network_proxy: None,
             status_line_invalid_items_warned,
+            sub_agent_statuses: HashMap::new(),
             status_line_branch: None,
             status_line_branch_cwd: None,
             status_line_branch_pending: false,
@@ -4045,17 +4051,36 @@ impl ChatWidget {
             EventMsg::ExitedReviewMode(review) => self.on_exited_review_mode(review),
             EventMsg::ContextCompacted(_) => self.on_agent_message("Context compacted".to_owned()),
             EventMsg::CollabAgentSpawnBegin(_) => {}
-            EventMsg::CollabAgentSpawnEnd(ev) => self.on_collab_event(collab::spawn_end(ev)),
+            EventMsg::CollabAgentSpawnEnd(ev) => {
+                if let Some(thread_id) = ev.new_thread_id.clone() {
+                    self.set_sub_agent_status(thread_id, ev.status.clone());
+                }
+                self.on_collab_event(collab::spawn_end(ev));
+            }
             EventMsg::CollabAgentInteractionBegin(_) => {}
             EventMsg::CollabAgentInteractionEnd(ev) => {
+                self.set_sub_agent_status(ev.receiver_thread_id.clone(), ev.status.clone());
                 self.on_collab_event(collab::interaction_end(ev))
             }
             EventMsg::CollabWaitingBegin(ev) => self.on_collab_event(collab::waiting_begin(ev)),
-            EventMsg::CollabWaitingEnd(ev) => self.on_collab_event(collab::waiting_end(ev)),
+            EventMsg::CollabWaitingEnd(ev) => {
+                self.set_sub_agent_statuses(
+                    ev.statuses
+                        .iter()
+                        .map(|(thread_id, status)| (thread_id.clone(), status.clone())),
+                );
+                self.on_collab_event(collab::waiting_end(ev));
+            }
             EventMsg::CollabCloseBegin(_) => {}
-            EventMsg::CollabCloseEnd(ev) => self.on_collab_event(collab::close_end(ev)),
+            EventMsg::CollabCloseEnd(ev) => {
+                self.set_sub_agent_status(ev.receiver_thread_id.clone(), AgentStatus::Shutdown);
+                self.on_collab_event(collab::close_end(ev));
+            }
             EventMsg::CollabResumeBegin(ev) => self.on_collab_event(collab::resume_begin(ev)),
-            EventMsg::CollabResumeEnd(ev) => self.on_collab_event(collab::resume_end(ev)),
+            EventMsg::CollabResumeEnd(ev) => {
+                self.set_sub_agent_status(ev.receiver_thread_id.clone(), ev.status.clone());
+                self.on_collab_event(collab::resume_end(ev));
+            }
             EventMsg::ThreadRolledBack(rollback) => {
                 if from_replay {
                     self.app_event_tx.send(AppEvent::ApplyThreadRollback {
@@ -4367,6 +4392,34 @@ impl ChatWidget {
         });
     }
 
+    fn set_sub_agent_status(&mut self, thread_id: ThreadId, status: AgentStatus) {
+        self.set_sub_agent_statuses(std::iter::once((thread_id, status)));
+    }
+
+    fn set_sub_agent_statuses<I>(&mut self, statuses: I)
+    where
+        I: IntoIterator<Item = (ThreadId, AgentStatus)>,
+    {
+        let running_before = self.running_sub_agents_count();
+        for (thread_id, status) in statuses {
+            if matches!(status, AgentStatus::PendingInit | AgentStatus::Running) {
+                self.sub_agent_statuses.insert(thread_id, status);
+            } else {
+                self.sub_agent_statuses.remove(&thread_id);
+            }
+        }
+        if self.running_sub_agents_count() != running_before {
+            self.refresh_status_line();
+        }
+    }
+
+    fn running_sub_agents_count(&self) -> usize {
+        self.sub_agent_statuses
+            .values()
+            .filter(|status| matches!(status, AgentStatus::Running))
+            .count()
+    }
+
     /// Resolves a display string for one configured status-line item.
     ///
     /// Returning `None` means "omit this item for now", not "configuration error". Callers rely on
@@ -4385,6 +4438,10 @@ impl ChatWidget {
             }
             StatusLineItem::ProjectRoot => self.status_line_project_root_name(),
             StatusLineItem::GitBranch => self.status_line_branch.clone(),
+            StatusLineItem::SubAgents => {
+                let running_sub_agents = self.running_sub_agents_count();
+                Some(format!("{running_sub_agents:02} Agents"))
+            }
             StatusLineItem::UsedTokens => {
                 let usage = self.status_line_total_usage();
                 let total = usage.tokens_in_context_window();

@@ -15,6 +15,7 @@
 //! - Context usage (remaining %, used %, window size)
 //! - Usage limits (5-hour, weekly)
 //! - Session info (ID, tokens used)
+//! - Sub-agent activity (running count)
 //! - Application version
 
 use ratatui::buffer::Buffer;
@@ -62,6 +63,9 @@ pub(crate) enum StatusLineItem {
     /// Current git branch name (if in a repository).
     GitBranch,
 
+    /// Number of currently running sub agents.
+    SubAgents,
+
     /// Percentage of context window remaining.
     ContextRemaining,
 
@@ -102,6 +106,7 @@ impl StatusLineItem {
             StatusLineItem::CurrentDir => "Current working directory",
             StatusLineItem::ProjectRoot => "Project root directory (omitted when unavailable)",
             StatusLineItem::GitBranch => "Current Git branch (omitted when unavailable)",
+            StatusLineItem::SubAgents => "Number of currently running sub agents",
             StatusLineItem::ContextRemaining => {
                 "Percentage of context window remaining (omitted when unknown)"
             }
@@ -138,6 +143,7 @@ impl StatusLineItem {
             StatusLineItem::CurrentDir => "~/project/path",
             StatusLineItem::ProjectRoot => "~/project",
             StatusLineItem::GitBranch => "feat/awesome-feature",
+            StatusLineItem::SubAgents => "03 Agents",
             StatusLineItem::ContextRemaining => "18% left",
             StatusLineItem::ContextUsed => "82% used",
             StatusLineItem::FiveHourLimit => "5h 100%",

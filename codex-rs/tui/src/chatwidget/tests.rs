@@ -27,8 +27,13 @@ use codex_core::protocol::AgentMessageDeltaEvent;
 use codex_core::protocol::AgentMessageEvent;
 use codex_core::protocol::AgentReasoningDeltaEvent;
 use codex_core::protocol::AgentReasoningEvent;
+use codex_core::protocol::AgentStatus;
 use codex_core::protocol::ApplyPatchApprovalRequestEvent;
 use codex_core::protocol::BackgroundEventEvent;
+use codex_core::protocol::CollabAgentInteractionEndEvent;
+use codex_core::protocol::CollabAgentSpawnEndEvent;
+use codex_core::protocol::CollabCloseEndEvent;
+use codex_core::protocol::CollabWaitingEndEvent;
 use codex_core::protocol::CreditsSnapshot;
 use codex_core::protocol::Event;
 use codex_core::protocol::EventMsg;
@@ -96,6 +101,7 @@ use pretty_assertions::assert_eq;
 #[cfg(target_os = "windows")]
 use serial_test::serial;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
@@ -1123,6 +1129,7 @@ async fn make_chatwidget_manual(
         current_cwd: None,
         session_network_proxy: None,
         status_line_invalid_items_warned: Arc::new(AtomicBool::new(false)),
+        sub_agent_statuses: HashMap::new(),
         status_line_branch: None,
         status_line_branch_cwd: None,
         status_line_branch_pending: false,
@@ -5850,6 +5857,102 @@ async fn status_line_branch_refreshes_after_interrupt() {
     });
 
     assert!(chat.status_line_branch_pending);
+}
+
+#[tokio::test]
+async fn status_line_sub_agents_uses_two_digit_running_count() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("00 Agents".to_string())
+    );
+
+    chat.set_sub_agent_status(ThreadId::new(), AgentStatus::Running);
+    chat.set_sub_agent_status(ThreadId::new(), AgentStatus::PendingInit);
+
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("01 Agents".to_string())
+    );
+
+    chat.set_sub_agent_status(ThreadId::new(), AgentStatus::Running);
+
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("02 Agents".to_string())
+    );
+}
+
+#[tokio::test]
+async fn status_line_sub_agents_tracks_collab_events() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+    chat.config.tui_status_line = Some(vec!["sub-agents".to_string()]);
+    chat.refresh_status_line();
+
+    let sender_thread_id = ThreadId::new();
+    let agent_a = ThreadId::new();
+    let agent_b = ThreadId::new();
+
+    chat.handle_codex_event(Event {
+        id: "collab-1".into(),
+        msg: EventMsg::CollabAgentSpawnEnd(CollabAgentSpawnEndEvent {
+            call_id: "spawn".to_string(),
+            sender_thread_id: sender_thread_id.clone(),
+            new_thread_id: Some(agent_a.clone()),
+            prompt: String::new(),
+            status: AgentStatus::Running,
+        }),
+    });
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("01 Agents".to_string())
+    );
+
+    chat.handle_codex_event(Event {
+        id: "collab-2".into(),
+        msg: EventMsg::CollabWaitingEnd(CollabWaitingEndEvent {
+            sender_thread_id: sender_thread_id.clone(),
+            call_id: "wait".to_string(),
+            statuses: HashMap::from([
+                (agent_a.clone(), AgentStatus::Running),
+                (agent_b.clone(), AgentStatus::Running),
+            ]),
+        }),
+    });
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("02 Agents".to_string())
+    );
+
+    chat.handle_codex_event(Event {
+        id: "collab-3".into(),
+        msg: EventMsg::CollabAgentInteractionEnd(CollabAgentInteractionEndEvent {
+            call_id: "send".to_string(),
+            sender_thread_id: sender_thread_id.clone(),
+            receiver_thread_id: agent_a.clone(),
+            prompt: String::new(),
+            status: AgentStatus::Completed(None),
+        }),
+    });
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("01 Agents".to_string())
+    );
+
+    chat.handle_codex_event(Event {
+        id: "collab-4".into(),
+        msg: EventMsg::CollabCloseEnd(CollabCloseEndEvent {
+            call_id: "close".to_string(),
+            sender_thread_id,
+            receiver_thread_id: agent_b,
+            status: AgentStatus::Running,
+        }),
+    });
+    assert_eq!(
+        chat.status_line_value_for_item(&StatusLineItem::SubAgents),
+        Some("00 Agents".to_string())
+    );
 }
 
 #[tokio::test]
