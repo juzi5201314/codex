@@ -13,6 +13,7 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
+    PlanModel,
     Approvals,
     Permissions,
     #[strum(serialize = "setup-default-sandbox")]
@@ -71,6 +72,7 @@ impl SlashCommand {
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Clean => "stop all background terminals",
             SlashCommand::Model => "choose what model and reasoning effort to use",
+            SlashCommand::PlanModel => "choose what model and reasoning effort to use in Plan mode",
             SlashCommand::Personality => "choose a communication style for Codex",
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Collab => "change collaboration mode (experimental)",
@@ -111,6 +113,7 @@ impl SlashCommand {
             | SlashCommand::Compact
             // | SlashCommand::Undo
             | SlashCommand::Model
+            | SlashCommand::PlanModel
             | SlashCommand::Personality
             | SlashCommand::Approvals
             | SlashCommand::Permissions

@@ -326,6 +326,18 @@
         "personality": {
           "$ref": "#/definitions/Personality"
         },
+        "plan_model": {
+          "description": "Optional model override used when entering Plan mode in the TUI.",
+          "type": "string"
+        },
+        "plan_model_reasoning_effort": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            }
+          ],
+          "description": "Optional reasoning effort override used when entering Plan mode in the TUI."
+        },
         "sandbox_mode": {
           "$ref": "#/definitions/SandboxMode"
         },
@@ -1556,6 +1568,18 @@
         }
       ],
       "description": "Optionally specify a personality for the model"
+    },
+    "plan_model": {
+      "description": "Optional model override used when entering Plan mode in the TUI.",
+      "type": "string"
+    },
+    "plan_model_reasoning_effort": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ReasoningEffort"
+        }
+      ],
+      "description": "Optional reasoning effort override used when entering Plan mode in the TUI."
     },
     "profile": {
       "description": "Profile to use from the `profiles` map.",

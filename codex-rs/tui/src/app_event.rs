@@ -145,6 +145,12 @@ pub(crate) enum AppEvent {
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 
+    /// Update the configured Plan-mode model/effort in the running app and widget.
+    UpdatePlanModelSelection {
+        model: Option<String>,
+        effort: Option<ReasoningEffort>,
+    },
+
     /// Update the active collaboration mask in the running app and widget.
     UpdateCollaborationMode(CollaborationModeMask),
 
@@ -154,6 +160,12 @@ pub(crate) enum AppEvent {
     /// Persist the selected model and reasoning effort to the appropriate config.
     PersistModelSelection {
         model: String,
+        effort: Option<ReasoningEffort>,
+    },
+
+    /// Persist the selected Plan-mode model and reasoning effort to the appropriate config.
+    PersistPlanModelSelection {
+        model: Option<String>,
         effort: Option<ReasoningEffort>,
     },
 
@@ -167,8 +179,18 @@ pub(crate) enum AppEvent {
         model: ModelPreset,
     },
 
+    /// Open the reasoning selection popup after picking a model for Plan mode.
+    OpenPlanReasoningPopup {
+        model: ModelPreset,
+    },
+
     /// Open the full model picker (non-auto models).
     OpenAllModelsPopup {
+        models: Vec<ModelPreset>,
+    },
+
+    /// Open the full model picker (non-auto models) for Plan mode.
+    OpenAllPlanModelsPopup {
         models: Vec<ModelPreset>,
     },
 

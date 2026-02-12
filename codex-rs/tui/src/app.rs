@@ -1638,6 +1638,10 @@ impl App {
                 self.chat_widget.set_model(&model);
                 self.refresh_status_line();
             }
+            AppEvent::UpdatePlanModelSelection { model, effort } => {
+                self.chat_widget.set_plan_model_selection(model, effort);
+                self.refresh_status_line();
+            }
             AppEvent::UpdateCollaborationMode(mask) => {
                 self.chat_widget.set_collaboration_mask(mask);
                 self.refresh_status_line();
@@ -1648,8 +1652,14 @@ impl App {
             AppEvent::OpenReasoningPopup { model } => {
                 self.chat_widget.open_reasoning_popup(model);
             }
+            AppEvent::OpenPlanReasoningPopup { model } => {
+                self.chat_widget.open_plan_reasoning_popup(model);
+            }
             AppEvent::OpenAllModelsPopup { models } => {
                 self.chat_widget.open_all_models_popup(models);
+            }
+            AppEvent::OpenAllPlanModelsPopup { models } => {
+                self.chat_widget.open_plan_all_models_popup(models);
             }
             AppEvent::OpenFullAccessConfirmation {
                 preset,
@@ -1962,6 +1972,48 @@ impl App {
                         } else {
                             self.chat_widget
                                 .add_error_message(format!("Failed to save default model: {err}"));
+                        }
+                    }
+                }
+            }
+            AppEvent::PersistPlanModelSelection { model, effort } => {
+                let profile = self.active_profile.as_deref();
+                match ConfigEditsBuilder::new(&self.config.codex_home)
+                    .with_profile(profile)
+                    .set_plan_model(model.as_deref(), effort)
+                    .apply()
+                    .await
+                {
+                    Ok(()) => {
+                        let mut message = match model.as_deref() {
+                            Some(model) => format!("Plan mode model changed to {model}"),
+                            None => "Plan mode model cleared".to_string(),
+                        };
+                        if let Some(model_slug) = model.as_deref()
+                            && let Some(label) = Self::reasoning_label_for(model_slug, effort)
+                        {
+                            message.push(' ');
+                            message.push_str(label);
+                        }
+                        if let Some(profile) = profile {
+                            message.push_str(" for ");
+                            message.push_str(profile);
+                            message.push_str(" profile");
+                        }
+                        self.chat_widget.add_info_message(message, None);
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            error = %err,
+                            "failed to persist plan model selection"
+                        );
+                        if let Some(profile) = profile {
+                            self.chat_widget.add_error_message(format!(
+                                "Failed to save plan model for profile `{profile}`: {err}"
+                            ));
+                        } else {
+                            self.chat_widget
+                                .add_error_message(format!("Failed to save plan model: {err}"));
                         }
                     }
                 }

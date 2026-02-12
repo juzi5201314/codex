@@ -18,12 +18,16 @@ use codex_protocol::openai_models::ReasoningEffort;
 #[schemars(deny_unknown_fields)]
 pub struct ConfigProfile {
     pub model: Option<String>,
+    /// Optional model override used when entering Plan mode in the TUI.
+    pub plan_model: Option<String>,
     /// The key in the `model_providers` map identifying the
     /// [`ModelProviderInfo`] to use.
     pub model_provider: Option<String>,
     pub approval_policy: Option<AskForApproval>,
     pub sandbox_mode: Option<SandboxMode>,
     pub model_reasoning_effort: Option<ReasoningEffort>,
+    /// Optional reasoning effort override used when entering Plan mode in the TUI.
+    pub plan_model_reasoning_effort: Option<ReasoningEffort>,
     pub model_reasoning_summary: Option<ReasoningSummary>,
     pub model_verbosity: Option<Verbosity>,
     pub personality: Option<Personality>,

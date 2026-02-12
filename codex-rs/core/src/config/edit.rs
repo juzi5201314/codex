@@ -25,6 +25,11 @@ pub enum ConfigEdit {
         model: Option<String>,
         effort: Option<ReasoningEffort>,
     },
+    /// Update the Plan-mode model selection and optional reasoning effort.
+    SetPlanModel {
+        model: Option<String>,
+        effort: Option<ReasoningEffort>,
+    },
     /// Update the active (or default) model personality.
     SetModelPersonality { personality: Option<Personality> },
     /// Toggle the acknowledgement flag under `[notice]`.
@@ -294,6 +299,18 @@ impl ConfigDocument {
                 );
                 mutated |= self.write_profile_value(
                     &["model_reasoning_effort"],
+                    effort.map(|effort| value(effort.to_string())),
+                );
+                mutated
+            }),
+            ConfigEdit::SetPlanModel { model, effort } => Ok({
+                let mut mutated = false;
+                mutated |= self.write_profile_value(
+                    &["plan_model"],
+                    model.as_ref().map(|model_value| value(model_value.clone())),
+                );
+                mutated |= self.write_profile_value(
+                    &["plan_model_reasoning_effort"],
                     effort.map(|effort| value(effort.to_string())),
                 );
                 mutated
@@ -745,6 +762,14 @@ impl ConfigEditsBuilder {
         self
     }
 
+    pub fn set_plan_model(mut self, model: Option<&str>, effort: Option<ReasoningEffort>) -> Self {
+        self.edits.push(ConfigEdit::SetPlanModel {
+            model: model.map(ToOwned::to_owned),
+            effort,
+        });
+        self
+    }
+
     pub fn set_personality(mut self, personality: Option<Personality>) -> Self {
         self.edits
             .push(ConfigEdit::SetModelPersonality { personality });
@@ -910,6 +935,29 @@ mod tests {
             std::fs::read_to_string(codex_home.join(CONFIG_TOML_FILE)).expect("read config");
         let expected = r#"model = "gpt-5.1-codex"
 model_reasoning_effort = "high"
+"#;
+        assert_eq!(contents, expected);
+    }
+
+    #[test]
+    fn blocking_set_plan_model_top_level() {
+        let tmp = tempdir().expect("tmpdir");
+        let codex_home = tmp.path();
+
+        apply_blocking(
+            codex_home,
+            None,
+            &[ConfigEdit::SetPlanModel {
+                model: Some("gpt-5.1-codex-mini".to_string()),
+                effort: Some(ReasoningEffort::Low),
+            }],
+        )
+        .expect("persist");
+
+        let contents =
+            std::fs::read_to_string(codex_home.join(CONFIG_TOML_FILE)).expect("read config");
+        let expected = r#"plan_model = "gpt-5.1-codex-mini"
+plan_model_reasoning_effort = "low"
 "#;
         assert_eq!(contents, expected);
     }

@@ -2672,7 +2672,18 @@ impl ChatComposer {
         let is_wsl = {
             #[cfg(target_os = "linux")]
             {
-                mode == FooterMode::ShortcutOverlay && crate::clipboard_paste::is_probably_wsl()
+                // Keep snapshot tests deterministic across environments (WSL vs non-WSL).
+                //
+                // The WSL-specific shortcut is still covered by targeted unit tests in
+                // `bottom_pane/footer.rs`.
+                #[cfg(test)]
+                {
+                    false
+                }
+                #[cfg(not(test))]
+                {
+                    mode == FooterMode::ShortcutOverlay && crate::clipboard_paste::is_probably_wsl()
+                }
             }
             #[cfg(not(target_os = "linux"))]
             {

@@ -132,6 +132,12 @@ pub struct Config {
     /// Model used specifically for review sessions.
     pub review_model: Option<String>,
 
+    /// Optional model override used when entering Plan mode in the TUI.
+    pub plan_model: Option<String>,
+
+    /// Optional reasoning effort override used when entering Plan mode in the TUI.
+    pub plan_model_reasoning_effort: Option<ReasoningEffort>,
+
     /// Size of the context window for the model, in tokens.
     pub model_context_window: Option<i64>,
 
@@ -854,6 +860,8 @@ pub struct ConfigToml {
     pub model: Option<String>,
     /// Review model override used by the `/review` feature.
     pub review_model: Option<String>,
+    /// Optional model override used when entering Plan mode in the TUI.
+    pub plan_model: Option<String>,
 
     /// Provider to use from the model_providers map.
     pub model_provider: Option<String>,
@@ -976,6 +984,8 @@ pub struct ConfigToml {
     pub show_raw_agent_reasoning: Option<bool>,
 
     pub model_reasoning_effort: Option<ReasoningEffort>,
+    /// Optional reasoning effort override used when entering Plan mode in the TUI.
+    pub plan_model_reasoning_effort: Option<ReasoningEffort>,
     pub model_reasoning_summary: Option<ReasoningSummary>,
     /// Optional verbosity control for GPT-5 models (Responses API `text.verbosity`).
     pub model_verbosity: Option<Verbosity>,
@@ -1610,6 +1620,7 @@ impl Config {
         let forced_login_method = cfg.forced_login_method;
 
         let model = model.or(config_profile.model).or(cfg.model);
+        let plan_model = config_profile.plan_model.or(cfg.plan_model);
 
         let compact_prompt = compact_prompt.or(cfg.compact_prompt).and_then(|value| {
             let trimmed = value.trim();
@@ -1654,6 +1665,9 @@ impl Config {
             .or(cfg.js_repl_node_path.map(Into::into));
 
         let review_model = override_review_model.or(cfg.review_model);
+        let plan_model_reasoning_effort = config_profile
+            .plan_model_reasoning_effort
+            .or(cfg.plan_model_reasoning_effort);
 
         let check_for_update_on_startup = cfg.check_for_update_on_startup.unwrap_or(true);
 
@@ -1718,6 +1732,8 @@ impl Config {
         let config = Self {
             model,
             review_model,
+            plan_model,
+            plan_model_reasoning_effort,
             model_context_window: cfg.model_context_window,
             model_auto_compact_token_limit: cfg.model_auto_compact_token_limit,
             model_provider_id,
@@ -4008,6 +4024,8 @@ model_verbosity = "high"
             Config {
                 model: Some("o3".to_string()),
                 review_model: None,
+                plan_model: None,
+                plan_model_reasoning_effort: None,
                 model_context_window: None,
                 model_auto_compact_token_limit: None,
                 model_provider_id: "openai".to_string(),
@@ -4115,6 +4133,8 @@ model_verbosity = "high"
         let expected_gpt3_profile_config = Config {
             model: Some("gpt-3.5-turbo".to_string()),
             review_model: None,
+            plan_model: None,
+            plan_model_reasoning_effort: None,
             model_context_window: None,
             model_auto_compact_token_limit: None,
             model_provider_id: "openai-custom".to_string(),
@@ -4220,6 +4240,8 @@ model_verbosity = "high"
         let expected_zdr_profile_config = Config {
             model: Some("o3".to_string()),
             review_model: None,
+            plan_model: None,
+            plan_model_reasoning_effort: None,
             model_context_window: None,
             model_auto_compact_token_limit: None,
             model_provider_id: "openai".to_string(),
@@ -4311,6 +4333,8 @@ model_verbosity = "high"
         let expected_gpt5_profile_config = Config {
             model: Some("gpt-5.1".to_string()),
             review_model: None,
+            plan_model: None,
+            plan_model_reasoning_effort: None,
             model_context_window: None,
             model_auto_compact_token_limit: None,
             model_provider_id: "openai".to_string(),
