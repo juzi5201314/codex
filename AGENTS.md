@@ -1,3 +1,6 @@
+# Fork version
+这是一个codex fork版本。对代码的任何改动都应该尽可能的低侵入，模块化，尽量减少与上游合并时的代码冲突。
+
 # Rust/codex-rs
 
 In the codex-rs folder where the rust code lives:
