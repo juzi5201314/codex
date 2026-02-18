@@ -4141,7 +4141,9 @@ impl ChatWidget {
                 self.set_sub_agent_status(ev.receiver_thread_id.clone(), ev.status.clone());
                 self.on_collab_event(multi_agents::interaction_end(ev))
             }
-            EventMsg::CollabWaitingBegin(ev) => self.on_collab_event(multi_agents::waiting_begin(ev)),
+            EventMsg::CollabWaitingBegin(ev) => {
+                self.on_collab_event(multi_agents::waiting_begin(ev))
+            }
             EventMsg::CollabWaitingEnd(ev) => {
                 self.set_sub_agent_statuses(
                     ev.statuses
@@ -4903,7 +4905,7 @@ impl ChatWidget {
             return;
         }
 
-        let presets: Vec<ModelPreset> = match self.models_manager.try_list_models(&self.config) {
+        let presets: Vec<ModelPreset> = match self.models_manager.try_list_models() {
             Ok(models) => models,
             Err(_) => {
                 self.add_info_message(
